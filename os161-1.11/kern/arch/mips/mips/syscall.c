@@ -6,7 +6,7 @@
 #include <machine/trapframe.h>
 #include <kern/callno.h>
 #include <syscall.h>
-
+#include "opt-A2.h"
 
 /*
  * System call handler.
@@ -73,7 +73,11 @@ mips_syscall(struct trapframe *tf)
 		break;
 
 	    /* Add stuff here */
- 
+		#if OPT_A2
+		case SYS_write:
+		err = sys_write(tf->a0, tf->a1, tf->a2);
+		#endif
+
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
