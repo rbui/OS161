@@ -18,6 +18,7 @@
 #include "opt-sfs.h"
 #include "opt-net.h"
 #include "opt-A1.h"
+#include "opt-A2.h"
 
 #define _PATH_SHELL "/bin/sh"
 
@@ -60,17 +61,25 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	int result;
 
 	assert(nargs >= 1);
-
+	
+	#if OPT_A2
+	#else
 	if (nargs > 2) {
 		kprintf("Warning: argument passing from menu not supported\n");
 	}
+	#endif
 
 	/* Hope we fit. */
 	assert(strlen(args[0]) < sizeof(progname));
 
 	strcpy(progname, args[0]);
-
+	
+	#if OPT_A2
+	result = runprogram(progname, args, nargs);
+	#else
 	result = runprogram(progname);
+	#endif
+
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
 			strerror(result));

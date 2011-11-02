@@ -2,6 +2,7 @@
 #define _TEST_H_
 
 #include "opt-A1.h"
+#include "opt-A2.h"
 /*
  * Declarations for test code and other miscellaneous functions.
  */
@@ -48,7 +49,10 @@ int nettest(int, char **);
 /* Kernel menu system */
 void menu(char *argstr);
 
+#if OPT_A2
+int runprogram(char *progname, char** args, unsigned long nargs);
+#else
 /* Routine for running userlevel test code. */
 int runprogram(char *progname);
-
+#endif
 #endif /* _TEST_H_ */

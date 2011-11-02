@@ -17,6 +17,7 @@
 #include <syscall.h>
 #include <version.h>
 #include "opt-A0.h"
+#include "opt-A2.h"
 
 
 /*
