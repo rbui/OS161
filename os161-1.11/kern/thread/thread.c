@@ -14,6 +14,7 @@
 #include <vnode.h>
 #include "opt-synchprobs.h"
 #include "opt-A1.h"
+#include "opt-A2.h"
 
 /* States a thread can be in. */
 typedef enum {
@@ -59,6 +60,10 @@ thread_create(const char *name)
 	thread->t_vmspace = NULL;
 
 	thread->t_cwd = NULL;
+	#if OPT_A2
+	thread->fileHandles = NULL;
+	thread->freeArray = NULL;
+	#endif
 	
 	// If you add things to the thread structure, be sure to initialize
 	// them here.

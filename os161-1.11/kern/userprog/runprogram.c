@@ -84,7 +84,7 @@ runprogram(char *progname)
 		stackptr -= sizeof(char) * (strlen(args[argIndex]) + 1);
 		//kprintf("Stack is :%x\n", stackptr);
 		usr_argv[argIndex] = stackptr;
-		/copyout(args[argIndex], usr_argv[argIndex], sizeof(char) * (strlen(args[argIndex]) + 1) );
+		copyout(args[argIndex], usr_argv[argIndex], sizeof(char) * (strlen(args[argIndex]) + 1) );
 
 	}
 	usr_argv[nargs] = 0;

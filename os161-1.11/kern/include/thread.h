@@ -1,6 +1,7 @@
 #ifndef _THREAD_H_
 #define _THREAD_H_
 #include "opt-A1.h"
+#include "opt-A2.h"
 /*
  * Definition of a thread.
  */
@@ -37,6 +38,11 @@ struct thread {
 	 * and is manipulated by the virtual filesystem (VFS) code.
 	 */
 	struct vnode *t_cwd;
+
+	#if OPT_A2
+	struct array *fileHandles;
+	struct array *freeArray;
+	#endif
 };
 
 /* Call once during startup to allocate data structures. */
