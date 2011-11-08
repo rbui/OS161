@@ -78,7 +78,7 @@ runprogram(char *progname)
 	
 	userptr_t *usr_argv = (userptr_t*)stackptr;
 	unsigned int argIndex = 0;
-	copyout(args, usr_argv, sizeof(char*)*nargs + 1);
+	copyout(args, usr_argv, sizeof(char*)*(nargs + 1));
 
 	for(argIndex = 0; argIndex < nargs; argIndex += 1) {
 		stackptr -= sizeof(char) * (strlen(args[argIndex]) + 1);

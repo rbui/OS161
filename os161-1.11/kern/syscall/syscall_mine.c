@@ -7,14 +7,27 @@
 #include <curthread.h>
 #include <vnode.h>
 #include <types.h>
+#include <kern/errno.h>
+#include <machine/trapframe.h>
 
 struct fileHandle {
 	struct vnode *file;
 	int offset;
 };
 
+struct lock *threadLock =  NULL;
+
+/*struct pidInfo {
+	cv *isDone;
+	int exitcode;
+	int done;
+	array *children;
+};*/
+
 
 struct lock *mutex =  NULL;
+struct lock *forkLock = NULL;
+struct lock *childLock = NULL;
 //struct array *vnodes = NULL, *freeArray = NULL;
 #define vnodes curthread->fileHandles
 #define freeArray curthread->freeArray
@@ -104,7 +117,8 @@ int sys_read(int fd, void *buf, size_t nbytes, int *err) {
 	result = copyout(kbuf, buf, nbytes - u.uio_resid);
 	kfree(kbuf);
 	if (result) {
-		//kprintf("reading fail, %d\n", fd);
+		//kprintf("reading fail, %d\n", fd);../../arch/mips/mips/syscall.c:152: error: invalid type argument of \ufffd\ufffd\ufffd->\ufffd\ufffd\ufffd
+
 		return -1;
 	}
 	return nbytes - u.uio_resid;
@@ -116,7 +130,7 @@ int sys_open(const char * filename, int flags, int *err) {
 
 	setup();
 	if (filename != NULL) {
-	
+
 		//create files array and freeArray if they aren't already
 		if(vnodes == NULL) {
 			vnodes = array_create();	
@@ -154,12 +168,12 @@ int sys_open(const char * filename, int flags, int *err) {
 
 		kfree(fname);
 		handle->offset = 0;
-
 		if (result) {
 			kfree(handle);
 			array_setguy(vnodes, *index, NULL);
 			array_add(freeArray, index);
 			lock_release(mutex);
+			*err = result;
 			//kprintf("STUFFING  failed%d\n", *index);
 			return -1;
 		}
@@ -197,5 +211,141 @@ int sys_close(int fd, int *err) {
 }
 
 void sys__exit(int exitcode) {
+	
+	//killchildren
+	if(threadLock == NULL) {
+		threadLock = lock_create("threadLock");
+	}
+	lock_acquire(threadLock);
+	struct pidInfo *curPid = array_getguy(pids, curthread->pid);
+	//array_setguy(pids, curthread->pid, NULL);
+	curPid->done = 1;
+	curPid->exitcode = exitcode;
+	cv_broadcast(curPid->isDone, threadLock);
+	lock_release(threadLock);
 	thread_exit();
 }
+
+void newThread(void *data, unsigned long numData) {
+	int s = splhigh();
+	int *pointers = data;
+	struct trapframe *tf = pointers[0];
+	struct array *fileHandles = pointers[1];
+	struct semaphore *sem = pointers[2];
+	struct addrspace *addr = pointers[3];
+	as_copy(addr, &(curthread->t_vmspace));
+
+	struct array * files=array_create();
+
+	int i =0;
+	for(i = 0; i <array_getnum(files); i += 1) {
+		array_add(files, array_getguy(fileHandles, i));
+	}
+	curthread->fileHandles = files;
+
+	struct trapframe trap;
+	trap = *tf;
+	trap.tf_v0 = 0;
+	trap.tf_a3 = 0;
+	trap.tf_epc += 4;
+	
+	V(sem);
+
+	splx(s);
+	md_forkentry(&trap);
+}
+
+int sys_fork(void *tf, int *err) {
+
+	if (forkLock == NULL) {
+		forkLock = lock_create("fork");
+	}
+	
+	if (procs >= MAX_PROC) {
+		return -1;
+	}
+	
+	lock_acquire(forkLock);
+	struct semaphore *sem = sem_create("sem", 0);
+	int *data = kmalloc(sizeof(int*) *4);
+
+	data[0] = tf;
+	data[1] = curthread->fileHandles;
+	data[2] = sem;
+	data[3] = curthread->t_vmspace;
+
+	struct thread *child;
+
+	thread_fork("child", data, 3, newThread, &child); 
+	P(sem);
+	pid_t returnPid = child->pid;
+	kfree(data);
+	lock_release(forkLock);
+
+	sem_destroy(sem);
+	return returnPid;
+}
+
+int sys_getpid() {
+	return curthread->pid;
+}
+
+pid_t sys_waitpid(pid_t pid, int *status, int options, int *err) {
+	
+	if(threadLock == NULL) {
+		threadLock = lock_create("threadLock");
+	}
+
+	if (options != 0) {
+		return -1;
+	}
+
+	if (pid >=0 && pid < array_getnum(pids) && array_getguy(pids, pid) != NULL) {
+		struct pidInfo *curPid = array_getguy(pids, pid);
+		if (curPid->done) {
+			*status = curPid->exitcode;
+		}
+		else {
+			lock_acquire(threadLock);
+			cv_wait(curPid->isDone, threadLock);
+			*status = curPid->exitcode;
+			lock_release(threadLock);
+		}
+		return pid;
+	}
+	
+	return -1;
+}
+
+int sys_execv(const char *program, char **args, int *err) {
+	int s = splhigh();
+	int nargs = 0, i = 0;
+	while(args[nargs] != NULL) {
+		nargs += 1;
+	}
+	char **run_args = kmalloc(sizeof(char)*nargs);
+	for(i =0; i<nargs; i+=1) {
+		run_args[i] = kstrdup(args[i]);
+	}
+	/*for(i =0; i<nargs; i+=1) {
+		kprintf("%s\n", run_args[i]);
+	}*/
+
+	char *path = kstrdup(program), *prog = kstrdup(args[0]);
+	
+	//thread_exit();
+	as_destroy(curthread->t_vmspace);
+	curthread->t_vmspace = NULL;
+
+	char *exec = kmalloc(sizeof(char)*(strlen("../os161-1.11") + strlen(path) + strlen(prog) +strlen("/") + 4));
+	strcpy(exec, "../os161-1.11"); 
+	strcat(exec, path);
+	strcat(exec, "/"); 
+	strcat(exec, prog); 
+	//kprintf("%s\n", exec);
+	splx(s);
+	int result = runprogram(path, run_args, nargs);
+	*err = result;
+	return -1;
+}
+

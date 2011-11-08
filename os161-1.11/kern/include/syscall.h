@@ -16,6 +16,14 @@ int sys_read(int fd, void * buf, size_t nbytes, int *err);
 void sys__exit(int exitcode);
 
 int sys_open(const char* filename, int flags, int *err);
+
+pid_t fork(void *tf, int*err);
+
+pid_t waitpid(pid_t pid, int *status, int options, int *err);
+
+pid_t sys_getpid();
+
+int sys_execv(const char *program, char **args, int *err);
 #endif
 
 

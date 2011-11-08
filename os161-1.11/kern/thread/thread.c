@@ -24,6 +24,34 @@ typedef enum {
 	S_ZOMB,
 } threadstate_t;
 
+
+
+#if OPT_A2
+struct array *pids = NULL;
+struct array *freePids = NULL;
+struct lock *threadMutex = NULL;
+struct lock *pidLock = NULL;
+
+void initArrays() {
+	if (pids == NULL) {
+		pids = array_create();
+		array_add(pids, NULL);
+	}
+
+	if (freePids == NULL ) {
+		freePids = array_create();
+	}
+
+	if (threadMutex == NULL) {
+		threadMutex = lock_create("mutexLock");
+	}
+	
+	if (pidLock == NULL) {
+		pidLock = lock_create("pidLock");
+	}
+}
+int procs = 0;
+#endif
 /* Global variable for the thread currently executing at any given time. */
 struct thread *curthread;
 
@@ -45,6 +73,7 @@ static
 struct thread *
 thread_create(const char *name)
 {
+	initArrays();
 	struct thread *thread = kmalloc(sizeof(struct thread));
 	if (thread==NULL) {
 		return NULL;
@@ -54,6 +83,10 @@ thread_create(const char *name)
 		kfree(thread);
 		return NULL;
 	}
+
+	if (procs>=MAX_PROC) {
+		return NULL;
+	}
 	thread->t_sleepaddr = NULL;
 	thread->t_stack = NULL;
 	
@@ -61,8 +94,34 @@ thread_create(const char *name)
 
 	thread->t_cwd = NULL;
 	#if OPT_A2
+	//file stuff
 	thread->fileHandles = NULL;
 	thread->freeArray = NULL;
+
+	//new pidInfo
+	struct pidInfo *curThreadInfo = kmalloc(sizeof(struct pidInfo));
+	curThreadInfo->isDone = cv_create("shit");
+	curThreadInfo->done = 0;
+	curThreadInfo->exitcode = 0;
+	curThreadInfo->children = array_create();
+
+	lock_acquire(pidLock);
+	pid_t curPid = -1;
+
+	//stuffing the array with pidInfo
+	if (array_getnum(freePids) > 0) {
+		pid_t curPid = array_getguy(freePids, 0);
+		array_remove(freePids, 0);
+		array_setguy(pids, curPid, curThreadInfo);
+	} else {
+		array_add(pids, curThreadInfo);
+		curPid = array_getnum(pids) - 1;
+	}
+
+	thread->pid = curPid;
+	procs += 1;
+	lock_release(pidLock);
+	//kprintf("pid: %d\n", curPid);
 	#endif
 	
 	// If you add things to the thread structure, be sure to initialize

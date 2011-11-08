@@ -8,6 +8,10 @@
 #include <syscall.h>
 #include "opt-A2.h"
 
+#if OPT_A2
+#include <curthread.h>
+#endif
+
 /*
  * System call handler.
  *
@@ -98,6 +102,26 @@ mips_syscall(struct trapframe *tf)
 		err = 0;
 		retval = sys_close(tf->tf_a0, &err);
 		break;
+
+		case SYS_fork:
+		err = 0;
+		retval = sys_fork(tf, &err);
+		break;
+		
+		case SYS_getpid:
+		err = 0;
+		retval = sys_getpid();
+		break;
+		
+		case SYS_waitpid:
+		err = 0;
+		retval = sys_waitpid(tf->tf_a0, tf->tf_a1, tf->tf_a2, &err);
+		break;
+		
+		case SYS_execv:
+		err = 0;
+		retval = sys_execv(tf->tf_a0, tf->tf_a1, &err);
+		break;
 		#endif
 
 	    default:
@@ -132,7 +156,6 @@ mips_syscall(struct trapframe *tf)
 	/* Make sure the syscall code didn't forget to lower spl */
 	assert(curspl==0);
 }
-
 void
 md_forkentry(struct trapframe *tf)
 {
@@ -142,6 +165,9 @@ md_forkentry(struct trapframe *tf)
 	 *
 	 * Thus, you can trash it and do things another way if you prefer.
 	 */
-
+	#if OPT_A2
+	mips_usermode(tf);
+	#else
 	(void)tf;
+	#endif
 }

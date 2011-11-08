@@ -9,8 +9,25 @@
 /* Get machine-dependent stuff */
 #include <machine/pcb.h>
 
-
 struct addrspace;
+
+#if OPT_A2
+
+extern struct array *pids;
+extern struct array *freePids;
+extern struct lock *threadMutex;
+extern struct lock *pidLock;
+
+struct pidInfo {
+	struct cv *isDone;
+	int exitcode;
+	int done;
+	struct array *children;
+};
+
+#define MAX_PROC 250
+extern int procs;
+#endif
 
 struct thread {
 	/**********************************************************/
@@ -42,6 +59,7 @@ struct thread {
 	#if OPT_A2
 	struct array *fileHandles;
 	struct array *freeArray;
+	pid_t pid;
 	#endif
 };
 
