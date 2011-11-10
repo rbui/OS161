@@ -22,6 +22,8 @@ struct pidInfo {
 	struct cv *isDone;
 	int exitcode;
 	int done;
+	int numWaiting;
+	int deleteable;
 	struct array *children;
 };
 

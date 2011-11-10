@@ -12,6 +12,7 @@
 
 struct fileHandle {
 	struct vnode *file;
+	int refCount;
 	int offset;
 };
 
@@ -28,6 +29,7 @@ struct lock *threadLock =  NULL;
 struct lock *mutex =  NULL;
 struct lock *forkLock = NULL;
 struct lock *childLock = NULL;
+struct lock *waitLock = NULL;
 //struct array *vnodes = NULL, *freeArray = NULL;
 #define vnodes curthread->fileHandles
 #define freeArray curthread->freeArray
@@ -78,7 +80,7 @@ int sys_write(int fd, const void *buf, size_t nbytes, int *err) {
 
 	kfree(kbuf);
 	if (result) {
-		*err = EIO;
+		*err = result;
 		return -1;
 	}
 
@@ -91,34 +93,26 @@ int sys_read(int fd, void *buf, size_t nbytes, int *err) {
 	setup();
 
 	if(fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
-		//kprintf("FILE OPEND, %d\n", fd);
 		return -1;
 	}
 	
 	struct fileHandle *handle = array_getguy(vnodes, fd);
 	struct uio u;
-	//kprintf("reading, %d\n", fd);
 	void *kbuf = kmalloc(nbytes);
-	//copyin((const_userptr_t)buf, kbuf, nbytes);
 	mk_kuio(&u, kbuf, nbytes, handle->offset, UIO_READ);
 	
 	lock_acquire(mutex);
 	int result = VOP_READ(handle->file, &u);
 	lock_release(mutex);
 
-	//kprintf("%s %d %d\n", (char*)kbuf, nbytes, u.uio_resid);
 	if (result) {
-		//kprintf("reading fail, %d\n", fd);
 		kfree(kbuf);
-		lock_release(mutex);
 		return -1;
 	}
 	handle->offset = u.uio_offset;
 	result = copyout(kbuf, buf, nbytes - u.uio_resid);
 	kfree(kbuf);
 	if (result) {
-		//kprintf("reading fail, %d\n", fd);../../arch/mips/mips/syscall.c:152: error: invalid type argument of \ufffd\ufffd\ufffd->\ufffd\ufffd\ufffd
-
 		return -1;
 	}
 	return nbytes - u.uio_resid;
@@ -146,13 +140,14 @@ int sys_open(const char * filename, int flags, int *err) {
 		}*/
 	
 		//attempt to open
-		lock_acquire(mutex);
 		struct fileHandle *handle = kmalloc(sizeof( struct fileHandle) );
 		char *fname= NULL;
 		int *index = kmalloc(sizeof(int));
 		fname = kstrdup(filename);
 
+		lock_acquire(mutex);
 		int result = vfs_open(fname, flags, &(handle->file));
+		lock_release(mutex);
 		//if there is a free node
 		if (array_getnum(freeArray) > 0) {
 			int *tmp = (int*)array_getguy(freeArray, 0);
@@ -168,23 +163,21 @@ int sys_open(const char * filename, int flags, int *err) {
 
 		kfree(fname);
 		handle->offset = 0;
+		handle->refCount = 1;
 		if (result) {
 			kfree(handle);
 			array_setguy(vnodes, *index, NULL);
 			array_add(freeArray, index);
-			lock_release(mutex);
 			*err = result;
-			//kprintf("STUFFING  failed%d\n", *index);
 			return -1;
 		}
 
-		lock_release(mutex);
 		int ind = *index;
-		//kprintf("STUFFING %d\n", *index);
 		kfree(index);
 		return ind;
 	}
 	else {
+		*err = EFAULT;
 		return -1;
 	}
 }
@@ -192,16 +185,21 @@ int sys_open(const char * filename, int flags, int *err) {
 int sys_close(int fd, int *err) {
 	setup();
 
-	if(fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
+	if(fd<3 || fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
 		return -1;
 	}
 
 	//attempt to  close
-	lock_acquire(mutex);
 	struct fileHandle *handle = array_getguy(vnodes, fd);
+	handle->refCount -= 1;
+	if(handle->refCount > 0) {
+		return 0;
+	}
 	int * index = kmalloc(sizeof(int*));
 	*index = fd;
+	lock_acquire(mutex);
 	vfs_close(handle->file);
+	lock_release(mutex);
 	kfree(handle);
 	array_setguy(vnodes, fd, NULL);
 	array_add(freeArray, index);
@@ -211,18 +209,83 @@ int sys_close(int fd, int *err) {
 }
 
 void sys__exit(int exitcode) {
+	int i = 0;
 	
 	//killchildren
 	if(threadLock == NULL) {
 		threadLock = lock_create("threadLock");
 	}
-	lock_acquire(threadLock);
+	
+	if (vnodes != NULL) {
+		for(i = 0; i<array_getnum(vnodes); i+=1) {
+			struct fileHandle *file = array_getguy(vnodes, i);
+			if (file != NULL) {
+				file->refCount -= 1;
+				if (file->refCount <= 0) {
+					vfs_close(file->file);
+				}
+			}
+		}
+		array_destroy(vnodes);
+	}
+
+	if(freeArray != NULL) {
+		for(i = 0; i<array_getnum(freeArray); i+=1) {
+			int *index  = array_getguy(freeArray, i);
+			kfree(index);
+		}
+		array_destroy(freeArray);
+	}
+	
+	if (waitLock == NULL) {
+		waitLock = lock_create("lock");
+	}
+	
+	lock_acquire(pidLock);
 	struct pidInfo *curPid = array_getguy(pids, curthread->pid);
-	//array_setguy(pids, curthread->pid, NULL);
 	curPid->done = 1;
 	curPid->exitcode = exitcode;
+	lock_release(pidLock);
+	
+	lock_acquire(threadLock);
 	cv_broadcast(curPid->isDone, threadLock);
 	lock_release(threadLock);
+
+
+	lock_acquire(pidLock);
+	struct array *childArray = curPid->children;
+	for(i = 0; i<array_getnum(childArray); i += 1) {
+		pid_t *childPid = array_getguy(childArray, i);
+		struct pidInfo *childInfo = array_getguy(pids, *childPid);
+		if(childInfo->deleteable) {	
+			pid_t *tmpPid = kmalloc(sizeof(pid_t));
+			array_setguy(pids, *childPid, NULL);
+			kfree(childInfo);
+			*tmpPid = *childPid;
+			array_add(freePids, tmpPid);
+			kfree(childPid);
+		}
+		else {
+			childInfo->deleteable = 1;
+		}
+	}
+	array_destroy(childArray);
+	childArray = NULL;	
+
+	if (curPid->deleteable) {
+		pid_t *tmpPid = kmalloc(sizeof(pid_t));
+		struct pidInfo *curPidInfo = array_getguy(pids, curthread->pid);
+		kfree(curPidInfo);
+		array_setguy(pids, curthread->pid, NULL);
+		*tmpPid = curthread->pid;
+		array_add(freePids, tmpPid);
+	}
+	else {
+		curPid->deleteable = 1;
+	}
+	lock_release(pidLock);
+
+	cv_destroy(curPid->isDone);
 	thread_exit();
 }
 
@@ -233,15 +296,31 @@ void newThread(void *data, unsigned long numData) {
 	struct array *fileHandles = pointers[1];
 	struct semaphore *sem = pointers[2];
 	struct addrspace *addr = pointers[3];
+	struct array *freeFiles = pointers[4];
+
 	as_copy(addr, &(curthread->t_vmspace));
 
-	struct array * files=array_create();
 
 	int i =0;
-	for(i = 0; i <array_getnum(files); i += 1) {
-		array_add(files, array_getguy(fileHandles, i));
+	if (fileHandles != NULL) {
+		struct array * files=array_create();
+		for(i = 0; i <array_getnum(fileHandles); i += 1) {
+			struct fileHandle *handle = array_getguy(fileHandles, i);
+			handle->refCount += 1;
+			array_add(files, handle);
+		}
+		curthread->fileHandles = files;
 	}
-	curthread->fileHandles = files;
+	
+	if (freeFiles != NULL) {
+		freeArray = array_create();
+		for(i = 0; i < array_getnum(freeFiles); i +=1 ) {
+			int *index = array_getguy(freeFiles, i);
+			int *a = kmalloc(sizeof(int));
+			*a = *index;
+			array_add(freeArray, a);
+		}
+	}
 
 	struct trapframe trap;
 	trap = *tf;
@@ -262,25 +341,42 @@ int sys_fork(void *tf, int *err) {
 	}
 	
 	if (procs >= MAX_PROC) {
+		*err = EAGAIN;
 		return -1;
 	}
 	
-	lock_acquire(forkLock);
 	struct semaphore *sem = sem_create("sem", 0);
-	int *data = kmalloc(sizeof(int*) *4);
+	int *data = kmalloc(sizeof(int*) *5);
 
 	data[0] = tf;
 	data[1] = curthread->fileHandles;
 	data[2] = sem;
 	data[3] = curthread->t_vmspace;
+	data[4] = freeArray;
 
 	struct thread *child;
 
-	thread_fork("child", data, 3, newThread, &child); 
+	int result = thread_fork("child", data, 3, newThread, &child); 
+
+	if (result) {
+		*err = result;
+		return -1;
+	}
+
 	P(sem);
 	pid_t returnPid = child->pid;
 	kfree(data);
-	lock_release(forkLock);
+
+	if (waitLock == NULL) {
+		waitLock = lock_create("fuckit");
+	}
+
+	lock_acquire(pidLock);
+	pid_t *toAdd  = kmalloc(sizeof(pid_t));
+	struct pidInfo *curPid = array_getguy(pids, curthread->pid);
+	*toAdd = returnPid;	
+	array_add(curPid->children, toAdd);
+	lock_release(pidLock);
 
 	sem_destroy(sem);
 	return returnPid;
@@ -297,11 +393,29 @@ pid_t sys_waitpid(pid_t pid, int *status, int options, int *err) {
 	}
 
 	if (options != 0) {
+		*err = EINVAL;
 		return -1;
 	}
 
 	if (pid >=0 && pid < array_getnum(pids) && array_getguy(pids, pid) != NULL) {
+		lock_acquire(pidLock);
 		struct pidInfo *curPid = array_getguy(pids, pid);
+		struct pidInfo *myPidInfo = array_getguy(pids, curthread->pid);
+		struct array *childArray = myPidInfo->children;
+		int i, found = 0;
+		for(i = 0; i<array_getnum(childArray); i += 1) {
+			pid_t *childPid = array_getguy(childArray, i);
+			if (*childPid == pid) {
+				found = 1;
+				break;
+			}
+		}
+		lock_release(pidLock);
+		if (found == 0) {
+			*status = 0;
+			return 0;
+		}
+
 		if (curPid->done) {
 			*status = curPid->exitcode;
 		}
@@ -313,12 +427,11 @@ pid_t sys_waitpid(pid_t pid, int *status, int options, int *err) {
 		}
 		return pid;
 	}
-	
+	*err = ESRCH;	
 	return -1;
 }
 
 int sys_execv(const char *program, char **args, int *err) {
-	int s = splhigh();
 	int nargs = 0, i = 0;
 	while(args[nargs] != NULL) {
 		nargs += 1;
@@ -327,23 +440,12 @@ int sys_execv(const char *program, char **args, int *err) {
 	for(i =0; i<nargs; i+=1) {
 		run_args[i] = kstrdup(args[i]);
 	}
-	/*for(i =0; i<nargs; i+=1) {
-		kprintf("%s\n", run_args[i]);
-	}*/
 
 	char *path = kstrdup(program), *prog = kstrdup(args[0]);
 	
-	//thread_exit();
 	as_destroy(curthread->t_vmspace);
 	curthread->t_vmspace = NULL;
 
-	char *exec = kmalloc(sizeof(char)*(strlen("../os161-1.11") + strlen(path) + strlen(prog) +strlen("/") + 4));
-	strcpy(exec, "../os161-1.11"); 
-	strcat(exec, path);
-	strcat(exec, "/"); 
-	strcat(exec, prog); 
-	//kprintf("%s\n", exec);
-	splx(s);
 	int result = runprogram(path, run_args, nargs);
 	*err = result;
 	return -1;

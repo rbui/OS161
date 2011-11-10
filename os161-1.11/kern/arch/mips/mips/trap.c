@@ -189,12 +189,13 @@ mips_trap(struct trapframe *tf)
 	 * Really fatal kernel-mode fault.
 	 */
 
+	/*
 	kprintf("panic: Fatal exception %u (%s) in kernel mode\n", code,
 		trapcodenames[code]);
 	kprintf("panic: EPC 0x%x, exception vaddr 0x%x\n", 
 		tf->tf_epc, tf->tf_vaddr);
 
-	panic("I can't handle this... I think I'll just die now...\n");
+	panic("I can't handle this... I think I'll just die now...\n");*/
 
  done:
 	/* Make sure interrupts are off */

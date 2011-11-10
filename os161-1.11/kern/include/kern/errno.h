@@ -36,5 +36,5 @@
 #define ENOEXEC      24     /* File is not executable */
 #define E2BIG        25     /* Argument list too long */
 #define EBADF        26     /* Bad file number */
-
+#define ESRCH		 27
 #endif /* _KERN_ERRNO_H_ */

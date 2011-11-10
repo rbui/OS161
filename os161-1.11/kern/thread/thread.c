@@ -99,20 +99,25 @@ thread_create(const char *name)
 	thread->freeArray = NULL;
 
 	//new pidInfo
+	lock_acquire(pidLock);
 	struct pidInfo *curThreadInfo = kmalloc(sizeof(struct pidInfo));
 	curThreadInfo->isDone = cv_create("shit");
 	curThreadInfo->done = 0;
 	curThreadInfo->exitcode = 0;
+	curThreadInfo->numWaiting = 0;
+	curThreadInfo->deleteable = 0;
 	curThreadInfo->children = array_create();
 
-	lock_acquire(pidLock);
 	pid_t curPid = -1;
 
 	//stuffing the array with pidInfo
 	if (array_getnum(freePids) > 0) {
-		pid_t curPid = array_getguy(freePids, 0);
+		pid_t *tmpPid = array_getguy(freePids, 0);
 		array_remove(freePids, 0);
-		array_setguy(pids, curPid, curThreadInfo);
+		array_setguy(pids, *tmpPid, curThreadInfo);
+		curPid = *tmpPid;
+		kfree(tmpPid);
+		
 	} else {
 		array_add(pids, curThreadInfo);
 		curPid = array_getnum(pids) - 1;
