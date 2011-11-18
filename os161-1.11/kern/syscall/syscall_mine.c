@@ -25,7 +25,7 @@ struct lock *threadLock =  NULL;
 	array *children;
 };*/
 
-
+int numOpen = 0;
 struct lock *mutex =  NULL;
 struct lock *forkLock = NULL;
 struct lock *childLock = NULL;
@@ -61,7 +61,7 @@ int sys_write(int fd, const void *buf, size_t nbytes, int *err) {
 
 	setup();
 
-	if(fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
+	if(fd<0 || fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
 		//kprintf("FILE OPEND, %d\n", fd);
 		*err = EBADF;
 		return -1;
@@ -70,10 +70,15 @@ int sys_write(int fd, const void *buf, size_t nbytes, int *err) {
 	struct fileHandle *handle = array_getguy(vnodes, fd);
 	struct uio u;
 	//kprintf("writing, %d\n", fd);
-	void *kbuf = kmalloc(nbytes);
-	copyin((const_userptr_t)buf, kbuf, nbytes);
+	void *kbuf = kmalloc(nbytes + 1);
+	int ret = copyin((const_userptr_t)buf, kbuf, nbytes + 1);
 	mk_kuio(&u, kbuf, nbytes, handle->offset, UIO_WRITE);
 	
+	if (ret) {
+		*err = ret;
+		return -1;
+	}
+
 	lock_acquire(mutex);
 	int result = VOP_WRITE(handle->file, &u);
 	lock_release(mutex);
@@ -92,7 +97,8 @@ int sys_read(int fd, void *buf, size_t nbytes, int *err) {
 
 	setup();
 
-	if(fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
+	if(fd<0 || fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
+		*err = EBADF;
 		return -1;
 	}
 	
@@ -110,9 +116,10 @@ int sys_read(int fd, void *buf, size_t nbytes, int *err) {
 		return -1;
 	}
 	handle->offset = u.uio_offset;
-	result = copyout(kbuf, buf, nbytes - u.uio_resid);
+	result = copyout(kbuf, buf, nbytes - u.uio_resid + 1);
 	kfree(kbuf);
 	if (result) {
+		*err = result;
 		return -1;
 	}
 	return nbytes - u.uio_resid;
@@ -171,7 +178,8 @@ int sys_open(const char * filename, int flags, int *err) {
 			*err = result;
 			return -1;
 		}
-
+		
+		numOpen += 1;
 		int ind = *index;
 		kfree(index);
 		return ind;
@@ -186,12 +194,14 @@ int sys_close(int fd, int *err) {
 	setup();
 
 	if(fd<3 || fd>=array_getnum(vnodes) || array_getguy(vnodes, fd) == NULL ) {
+		*err = EBADF;
 		return -1;
 	}
 
 	//attempt to  close
 	struct fileHandle *handle = array_getguy(vnodes, fd);
 	handle->refCount -= 1;
+	numOpen -=1;
 	if(handle->refCount > 0) {
 		return 0;
 	}
@@ -203,8 +213,7 @@ int sys_close(int fd, int *err) {
 	kfree(handle);
 	array_setguy(vnodes, fd, NULL);
 	array_add(freeArray, index);
-	lock_release(mutex);
-
+	
 	return 0;
 }
 
@@ -275,7 +284,7 @@ void sys__exit(int exitcode) {
 	if (curPid->deleteable) {
 		pid_t *tmpPid = kmalloc(sizeof(pid_t));
 		struct pidInfo *curPidInfo = array_getguy(pids, curthread->pid);
-		kfree(curPidInfo);
+		//kfree(curPidInfo);
 		array_setguy(pids, curthread->pid, NULL);
 		*tmpPid = curthread->pid;
 		array_add(freePids, tmpPid);
@@ -283,9 +292,9 @@ void sys__exit(int exitcode) {
 	else {
 		curPid->deleteable = 1;
 	}
+	cv_destroy(curPid->isDone);
 	lock_release(pidLock);
 
-	cv_destroy(curPid->isDone);
 	thread_exit();
 }
 
@@ -397,6 +406,17 @@ pid_t sys_waitpid(pid_t pid, int *status, int options, int *err) {
 		return -1;
 	}
 
+	if (status == NULL) {
+		*err = EFAULT;
+		return -1;
+	}
+	int one = 1;
+	int tmp = copyin(status, &one, sizeof(int));
+	if (tmp) {
+		*err = tmp;
+		return -1;
+	}
+
 	if (pid >=0 && pid < array_getnum(pids) && array_getguy(pids, pid) != NULL) {
 		lock_acquire(pidLock);
 		struct pidInfo *curPid = array_getguy(pids, pid);
@@ -427,26 +447,71 @@ pid_t sys_waitpid(pid_t pid, int *status, int options, int *err) {
 		}
 		return pid;
 	}
-	*err = ESRCH;	
+	*err = EINVAL;	
 	return -1;
 }
 
 int sys_execv(const char *program, char **args, int *err) {
 	int nargs = 0, i = 0;
+	int result = 0, len;
+	
+	if (program == NULL) {
+		*err = EFAULT;
+		return -1;
+	}
+	
+	char path[1024];
+	result = copyinstr(program, path, 1024, &len);
+	if(result) {
+		*err = EFAULT;
+		return -1;
+	}
+	if (strlen(path)==0) {
+		*err = EINVAL;
+		return -1;
+	}
+
+	if (args == NULL) {
+		*err = EFAULT;
+		return -1;
+	}
+	
+
+	int test;
+	result = copyin(args, &test, sizeof(int));
+	if (result) {
+		*err = EFAULT;
+		return -1;
+	}
+
 	while(args[nargs] != NULL) {
+		result = copyin(args + nargs*4, &test, sizeof(int));
+		if (result) {
+			*err = EFAULT;
+			return -1;
+		}
+
 		nargs += 1;
 	}
 	char **run_args = kmalloc(sizeof(char)*nargs);
 	for(i =0; i<nargs; i+=1) {
-		run_args[i] = kstrdup(args[i]);
+		run_args[i] = kmalloc(sizeof(char)*1024);
+		result = copyinstr(args[i], run_args[i], 1024, &len);
+		if(result) {
+			*err = EFAULT;
+			return -1;
+		}
 	}
-
-	char *path = kstrdup(program), *prog = kstrdup(args[0]);
+	if (result) {
+		*err = EFAULT;
+		return -1;
+	}
 	
 	as_destroy(curthread->t_vmspace);
 	curthread->t_vmspace = NULL;
+	
 
-	int result = runprogram(path, run_args, nargs);
+	result = runprogram(path, run_args, nargs);
 	*err = result;
 	return -1;
 }
