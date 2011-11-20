@@ -1,0 +1,42 @@
+Script started on Wed 14 Sep 2011 03:12:44 PM EDT
+You have mail.
+1%>linux028:[1m~/cs350-os161/root[0m> exit[2@scexit[34Gys161 kernel
+sys161: System/161 release 1.99.05, compiled Feb  4 2011 15:14:48
+
+OS/161 base system version 1.11
+Copyright (c) 2000, 2001, 2002, 2003
+   President and Fellows of Harvard College.  All rights reserved.
+
+Put-your-group-name-here's system version 0 (ASST0 #3)
+
+Hello World
+Cpu is MIPS r2000/r3000
+336k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+hardclock on ltimer0 (100 hz)
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+pseudorand0 (virtual)
+
+OS/161 kernel [? for menu]: q
+Shutting down.
+The system is halted.
+sys161: 86125502 cycles (2607370 run, 83518132 global-idle)
+sys161:   cpu0: 2607370 kern, 0 user, 0 idle)
+sys161: 939 irqs 0 exns 0r/0w disk 7r/625w console 0r/0w/1m emufs 0r/0w net
+sys161: Elapsed real time: 3.442014 seconds (25.0218 mhz)
+sys161: Elapsed virtual time: 3.445020097 seconds (25 mhz)
+1%>linux028:[1m~/cs350-os161/root[0m> exit
+exit
+
+Script done on Wed 14 Sep 2011 03:12:53 PM EDT
