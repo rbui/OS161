@@ -9,6 +9,11 @@
  * assignment, this file is not compiled or linked or in any way
  * used. The cheesy hack versions in dumbvm.c are used instead.
  */
+#if OPT_A3
+void vm_bootstrap(void){	
+	/* Do nothing. */
+}
+#endif
 
 struct addrspace *
 as_create(void)
