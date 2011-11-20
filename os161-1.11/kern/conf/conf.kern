@@ -453,8 +453,11 @@ file		test/malloctest.c
 file		test/fstest.c
 optfile net	test/nettest.c
 
+<<<<<<< HEAD
 # sys code
 file		syscall/syscall_mine.c
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 # UW options for different assignments
 defoption A0
 defoption A1

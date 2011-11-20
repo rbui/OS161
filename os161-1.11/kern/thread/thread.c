@@ -14,7 +14,10 @@
 #include <vnode.h>
 #include "opt-synchprobs.h"
 #include "opt-A1.h"
+<<<<<<< HEAD
 #include "opt-A2.h"
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 /* States a thread can be in. */
 typedef enum {
@@ -24,6 +27,7 @@ typedef enum {
 	S_ZOMB,
 } threadstate_t;
 
+<<<<<<< HEAD
 
 
 #if OPT_A2
@@ -52,6 +56,8 @@ void initArrays() {
 }
 int procs = 0;
 #endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 /* Global variable for the thread currently executing at any given time. */
 struct thread *curthread;
 
@@ -73,7 +79,10 @@ static
 struct thread *
 thread_create(const char *name)
 {
+<<<<<<< HEAD
 	initArrays();
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	struct thread *thread = kmalloc(sizeof(struct thread));
 	if (thread==NULL) {
 		return NULL;
@@ -83,16 +92,20 @@ thread_create(const char *name)
 		kfree(thread);
 		return NULL;
 	}
+<<<<<<< HEAD
 
 	if (procs>=MAX_PROC) {
 		return NULL;
 	}
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	thread->t_sleepaddr = NULL;
 	thread->t_stack = NULL;
 	
 	thread->t_vmspace = NULL;
 
 	thread->t_cwd = NULL;
+<<<<<<< HEAD
 	#if OPT_A2
 	//file stuff
 	thread->fileHandles = NULL;
@@ -128,6 +141,8 @@ thread_create(const char *name)
 	lock_release(pidLock);
 	//kprintf("pid: %d\n", curPid);
 	#endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	
 	// If you add things to the thread structure, be sure to initialize
 	// them here.

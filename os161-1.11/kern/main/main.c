@@ -17,7 +17,10 @@
 #include <syscall.h>
 #include <version.h>
 #include "opt-A0.h"
+<<<<<<< HEAD
 #include "opt-A2.h"
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 
 /*

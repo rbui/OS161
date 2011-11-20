@@ -7,11 +7,14 @@
 #include <vm.h>
 #include <thread.h>
 #include <curthread.h>
+<<<<<<< HEAD
 #include "opt-A2.h"
 
 #if OPT_A2
 #include <syscall.h>
 #endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 extern u_int32_t curkstack;
 
@@ -50,8 +53,12 @@ kill_curthread(u_int32_t epc, unsigned code, u_int32_t vaddr)
 	/*
 	 * You will probably want to change this.
 	 */
+<<<<<<< HEAD
 	sys__exit(code);
 	//panic("I don't know how to handle this\n");
+=======
+	panic("I don't know how to handle this\n");
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 }
 
 /*
@@ -146,8 +153,12 @@ mips_trap(struct trapframe *tf)
 		 * The MIPS won't even tell you what invalid address
 		 * caused the bus error.
 		 */
+<<<<<<< HEAD
 		sys__exit(code);
 		//panic("Bus error exception, PC=0x%x\n", tf->tf_epc);
+=======
+		panic("Bus error exception, PC=0x%x\n", tf->tf_epc);
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 		break;
 	}
 
@@ -196,19 +207,25 @@ mips_trap(struct trapframe *tf)
 	 * Really fatal kernel-mode fault.
 	 */
 
+<<<<<<< HEAD
 	#if OPT_A2
 	tf->tf_v0 = code;
 	tf->tf_a3 = 1;
 	sys__exit(code);
 	return;
 	#else
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	kprintf("panic: Fatal exception %u (%s) in kernel mode\n", code,
 		trapcodenames[code]);
 	kprintf("panic: EPC 0x%x, exception vaddr 0x%x\n", 
 		tf->tf_epc, tf->tf_vaddr);
 
 	panic("I can't handle this... I think I'll just die now...\n");
+<<<<<<< HEAD
 	#endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
  done:
 	/* Make sure interrupts are off */

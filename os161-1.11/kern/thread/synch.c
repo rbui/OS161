@@ -129,7 +129,11 @@ lock_destroy(struct lock *lock)
 	// add stuff here as needed
 	#if OPT_A1
 	int spl = splhigh();
+<<<<<<< HEAD
 	//assert(thread_hassleepers == 0);
+=======
+	assert(thread_hassleepers == 0);
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	splx(spl);
 	#endif
 	

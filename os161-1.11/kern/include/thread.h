@@ -1,7 +1,10 @@
 #ifndef _THREAD_H_
 #define _THREAD_H_
 #include "opt-A1.h"
+<<<<<<< HEAD
 #include "opt-A2.h"
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 /*
  * Definition of a thread.
  */
@@ -9,6 +12,7 @@
 /* Get machine-dependent stuff */
 #include <machine/pcb.h>
 
+<<<<<<< HEAD
 struct addrspace;
 
 #if OPT_A2
@@ -30,6 +34,10 @@ struct pidInfo {
 #define MAX_PROC 250
 extern int procs;
 #endif
+=======
+
+struct addrspace;
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 struct thread {
 	/**********************************************************/
@@ -57,12 +65,15 @@ struct thread {
 	 * and is manipulated by the virtual filesystem (VFS) code.
 	 */
 	struct vnode *t_cwd;
+<<<<<<< HEAD
 
 	#if OPT_A2
 	struct array *fileHandles;
 	struct array *freeArray;
 	pid_t pid;
 	#endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 };
 
 /* Call once during startup to allocate data structures. */

@@ -6,11 +6,15 @@
 #include <machine/trapframe.h>
 #include <kern/callno.h>
 #include <syscall.h>
+<<<<<<< HEAD
 #include "opt-A2.h"
 
 #if OPT_A2
 #include <curthread.h>
 #endif
+=======
+
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 /*
  * System call handler.
@@ -77,6 +81,7 @@ mips_syscall(struct trapframe *tf)
 		break;
 
 	    /* Add stuff here */
+<<<<<<< HEAD
 		#if OPT_A2
 		case SYS_write:
 		err = 0;
@@ -124,6 +129,9 @@ mips_syscall(struct trapframe *tf)
 		break;
 		#endif
 
+=======
+ 
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
@@ -156,6 +164,10 @@ mips_syscall(struct trapframe *tf)
 	/* Make sure the syscall code didn't forget to lower spl */
 	assert(curspl==0);
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 void
 md_forkentry(struct trapframe *tf)
 {
@@ -165,9 +177,14 @@ md_forkentry(struct trapframe *tf)
 	 *
 	 * Thus, you can trash it and do things another way if you prefer.
 	 */
+<<<<<<< HEAD
 	#if OPT_A2
 	mips_usermode(tf);
 	#else
 	(void)tf;
 	#endif
+=======
+
+	(void)tf;
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 }

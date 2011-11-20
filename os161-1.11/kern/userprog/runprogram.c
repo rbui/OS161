@@ -14,11 +14,14 @@
 #include <vm.h>
 #include <vfs.h>
 #include <test.h>
+<<<<<<< HEAD
 #include "opt-A2.h"
 
 #if OP_A2
 #include <types.h>
 #endif
+=======
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -26,12 +29,17 @@
  *
  * Calls vfs_open on progname and thus may destroy it.
  */
+<<<<<<< HEAD
 #if OPT_A2
 int runprogram(char* progname, char **args, unsigned long nargs)
 #else
 int
 runprogram(char *progname)
 #endif
+=======
+int
+runprogram(char *progname)
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 {
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
@@ -66,12 +74,17 @@ runprogram(char *progname)
 
 	/* Done with the file now. */
 	vfs_close(v);
+<<<<<<< HEAD
+=======
+
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	/* Define the user stack in the address space */
 	result = as_define_stack(curthread->t_vmspace, &stackptr);
 	if (result) {
 		/* thread_exit destroys curthread->t_vmspace */
 		return result;
 	}
+<<<<<<< HEAD
 	
 	#if OPT_A2
 	stackptr -= sizeof(char*) * (nargs + 1);
@@ -109,6 +122,13 @@ runprogram(char *progname)
 	md_usermode(0 /*argc*/, NULL /*userspace addr of argv*/,
 		    stackptr, entrypoint);
 	#endif
+=======
+
+	/* Warp to user mode. */
+	md_usermode(0 /*argc*/, NULL /*userspace addr of argv*/,
+		    stackptr, entrypoint);
+	
+>>>>>>> fed23e5f1c87e30850e46c38ef4eb0b6c6737c5c
 	/* md_usermode does not return */
 	panic("md_usermode returned\n");
 	return EINVAL;
